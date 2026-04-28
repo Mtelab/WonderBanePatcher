@@ -221,6 +221,10 @@ class PatcherApp(tk.Tk):
         self.launch_btn = ttk.Button(self.bg_canvas, text="Launch", command=self.launch_game, state="disabled")
         self.bg_canvas.create_window(600, 380, window=self.launch_btn, anchor="nw", width=88, height=44)
 
+        # Kick off a background manifest fetch so the Launch button can
+        # auto-enable for users who are already up to date.
+        self._check_version_at_startup()
+
     # ------------ version helpers
     def _format_version_line(self) -> str:
         installed = self.installed_version or "unknown"
@@ -232,6 +236,31 @@ class PatcherApp(tk.Tk):
             self.bg_canvas.itemconfig(self._version_id, text=self._format_version_line())
         except Exception:
             pass
+
+    def _update_launch_state(self) -> None:
+        """Light up Launch only when installed and latest are known and equal."""
+        in_sync = (
+            self.installed_version is not None
+            and self.latest_version is not None
+            and self.installed_version == self.latest_version
+        )
+        if in_sync:
+            self.launch_btn.configure(style="Go.TButton", state="normal")
+        else:
+            self.launch_btn.configure(style="TButton", state="disabled")
+
+    def _check_version_at_startup(self) -> None:
+        """Background fetch of manifest at startup so already-up-to-date users
+        can hit Launch without clicking Check & Patch first."""
+        def worker():
+            try:
+                data = fetch_url(MANIFEST_URL, timeout=10)
+                self.latest_version = json.loads(data.decode("utf-8")).get("gameVersion")
+            except Exception:
+                return
+            self.after(0, self._refresh_version_line)
+            self.after(0, self._update_launch_state)
+        threading.Thread(target=worker, daemon=True).start()
 
     # ------------ background loader
     def _load_bg(self):
@@ -364,7 +393,7 @@ class PatcherApp(tk.Tk):
                     s["installed_version"] = self.latest_version
                     save_settings(s)
                     self._refresh_version_line()
-                self.launch_btn.configure(style="Go.TButton", state="normal")
+                self._update_launch_state()
                 return
 
             self.progress["value"] = 0
