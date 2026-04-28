@@ -131,6 +131,8 @@ class PatcherApp(tk.Tk):
 
         settings = load_settings()
         self.install_dir = tk.StringVar(value=settings.get("install_dir", DEFAULT_INSTALL_DIR))
+        self.installed_version = settings.get("installed_version")
+        self.latest_version = None  # populated after manifest fetch
         self.status = tk.StringVar(value="Ready.")
         self.detail = tk.StringVar(value="")
         self.busy = False
@@ -172,6 +174,13 @@ class PatcherApp(tk.Tk):
             font=("Segoe UI", 9), fill="#cfcfcf",
         )
 
+        # Version line. Updated after manifest fetch and again after a successful patch.
+        self._version_id = self.bg_canvas.create_text(
+            self.WIN_W // 2, 92,
+            text=self._format_version_line(),
+            font=("Segoe UI", 9, "bold"), fill="#ffa033",
+        )
+
         self.bg_canvas.create_text(
             32, 120, text="Game folder", anchor="w",
             font=("Segoe UI", 10, "bold"), fill="#e8e8e8",
@@ -208,6 +217,18 @@ class PatcherApp(tk.Tk):
         self.bg_canvas.create_window(32, 380, window=self.patch_btn, anchor="nw", width=160, height=44)
         self.launch_btn = ttk.Button(self.bg_canvas, text="Launch", command=self.launch_game)
         self.bg_canvas.create_window(600, 380, window=self.launch_btn, anchor="nw", width=88, height=44)
+
+    # ------------ version helpers
+    def _format_version_line(self) -> str:
+        installed = self.installed_version or "unknown"
+        latest = self.latest_version or "checking…"
+        return f"Installed: {installed}    Latest: {latest}"
+
+    def _refresh_version_line(self) -> None:
+        try:
+            self.bg_canvas.itemconfig(self._version_id, text=self._format_version_line())
+        except Exception:
+            pass
 
     # ------------ background loader
     def _load_bg(self):
@@ -303,6 +324,8 @@ class PatcherApp(tk.Tk):
             manifest = json.loads(data.decode("utf-8"))
             files = manifest.get("files", [])
             base_url = SERVER_BASE + manifest.get("baseUrl", "client/")
+            self.latest_version = manifest.get("gameVersion")
+            self._refresh_version_line()
             self.set_status(f"Manifest loaded ({len(files)} files). Comparing…")
 
             to_download = []
@@ -329,6 +352,15 @@ class PatcherApp(tk.Tk):
                 self.progress["value"] = self.progress["maximum"] = 1
                 self.progress["value"] = 1
                 self.set_status("Already up to date.", "Nothing to download.")
+                # Stamp the installed version even when nothing changed, so a
+                # fresh-install user who runs the patcher and finds no diffs
+                # still gets the version label updated from "unknown".
+                if self.latest_version and self.installed_version != self.latest_version:
+                    self.installed_version = self.latest_version
+                    s = load_settings()
+                    s["installed_version"] = self.latest_version
+                    save_settings(s)
+                    self._refresh_version_line()
                 self.launch_btn.configure(style="Accent.TButton")
                 return
 
@@ -359,9 +391,21 @@ class PatcherApp(tk.Tk):
                 self.progress["value"] = done_bytes
 
             elapsed = time.time() - t0
+            previous_version = self.installed_version
+            if self.latest_version:
+                self.installed_version = self.latest_version
+                s = load_settings()
+                s["installed_version"] = self.latest_version
+                save_settings(s)
+                self._refresh_version_line()
+            ver_summary = ""
+            if previous_version and self.latest_version and previous_version != self.latest_version:
+                ver_summary = f"  Version {previous_version} → {self.latest_version}."
+            elif self.latest_version:
+                ver_summary = f"  Version {self.latest_version}."
             self.set_status(
                 "Patch complete.",
-                f"{len(to_download)} files updated, {total_bytes / 1024 / 1024:.1f} MB in {elapsed:.0f}s.",
+                f"{len(to_download)} files updated, {total_bytes / 1024 / 1024:.1f} MB in {elapsed:.0f}s.{ver_summary}",
             )
             self.launch_btn.configure(style="Accent.TButton")
         except urllib.error.URLError as e:
