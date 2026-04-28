@@ -158,6 +158,9 @@ class PatcherApp(tk.Tk):
         style.configure("Accent.TButton", font=("Segoe UI", 11, "bold"), padding=10,
                         background="#ffa033", foreground="#000000", borderwidth=0)
         style.map("Accent.TButton", background=[("active", "#ffb866")])
+        style.configure("Go.TButton", font=("Segoe UI", 11, "bold"), padding=10,
+                        background="#3acb6c", foreground="#000000", borderwidth=0)
+        style.map("Go.TButton", background=[("active", "#5fe28a")])
         style.configure("TEntry", fieldbackground="#1c1c20", foreground="#e0e0e0",
                         insertcolor="#e0e0e0", borderwidth=0)
         style.configure("Horizontal.TProgressbar", troughcolor="#1c1c20",
@@ -361,7 +364,7 @@ class PatcherApp(tk.Tk):
                     s["installed_version"] = self.latest_version
                     save_settings(s)
                     self._refresh_version_line()
-                self.launch_btn.configure(style="Accent.TButton", state="normal")
+                self.launch_btn.configure(style="Go.TButton", state="normal")
                 return
 
             self.progress["value"] = 0
@@ -407,7 +410,7 @@ class PatcherApp(tk.Tk):
                 "Patch complete.",
                 f"{len(to_download)} files updated, {total_bytes / 1024 / 1024:.1f} MB in {elapsed:.0f}s.{ver_summary}",
             )
-            self.launch_btn.configure(style="Accent.TButton", state="normal")
+            self.launch_btn.configure(style="Go.TButton", state="normal")
         except urllib.error.URLError as e:
             messagebox.showerror("Network error", f"Could not reach the patch server.\n\n{e}")
             self.set_status("Network error.")
