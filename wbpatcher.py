@@ -215,7 +215,7 @@ class PatcherApp(tk.Tk):
             command=self.start_patch,
         )
         self.bg_canvas.create_window(32, 380, window=self.patch_btn, anchor="nw", width=160, height=44)
-        self.launch_btn = ttk.Button(self.bg_canvas, text="Launch", command=self.launch_game)
+        self.launch_btn = ttk.Button(self.bg_canvas, text="Launch", command=self.launch_game, state="disabled")
         self.bg_canvas.create_window(600, 380, window=self.launch_btn, anchor="nw", width=88, height=44)
 
     # ------------ version helpers
@@ -361,7 +361,7 @@ class PatcherApp(tk.Tk):
                     s["installed_version"] = self.latest_version
                     save_settings(s)
                     self._refresh_version_line()
-                self.launch_btn.configure(style="Accent.TButton")
+                self.launch_btn.configure(style="Accent.TButton", state="normal")
                 return
 
             self.progress["value"] = 0
@@ -407,7 +407,7 @@ class PatcherApp(tk.Tk):
                 "Patch complete.",
                 f"{len(to_download)} files updated, {total_bytes / 1024 / 1024:.1f} MB in {elapsed:.0f}s.{ver_summary}",
             )
-            self.launch_btn.configure(style="Accent.TButton")
+            self.launch_btn.configure(style="Accent.TButton", state="normal")
         except urllib.error.URLError as e:
             messagebox.showerror("Network error", f"Could not reach the patch server.\n\n{e}")
             self.set_status("Network error.")
@@ -424,36 +424,6 @@ class PatcherApp(tk.Tk):
         if not exe.is_file():
             messagebox.showerror("Game not found", f"Could not find {GAME_EXE_REL} in {target}.\n\nPatch first?")
             return
-
-        # Refresh the latest version from the manifest so the warning is
-        # accurate even if the user opened the patcher and went straight to
-        # Launch without clicking Check & Patch first. A network failure here
-        # is non-fatal -- we just skip the version warning and let them play.
-        if not self.latest_version:
-            try:
-                data = fetch_url(MANIFEST_URL, timeout=10)
-                self.latest_version = json.loads(data.decode("utf-8")).get("gameVersion")
-                self._refresh_version_line()
-            except Exception:
-                pass
-
-        if self.latest_version and self.installed_version != self.latest_version:
-            if self.installed_version:
-                msg = (
-                    f"Your installed version is {self.installed_version}.\n"
-                    f"The latest version is {self.latest_version}.\n\n"
-                    "You may experience a less than ideal experience until you patch.\n\n"
-                    "Launch anyway?"
-                )
-            else:
-                msg = (
-                    f"The latest version is {self.latest_version}.\n"
-                    "We don't have a record of your installed version yet.\n\n"
-                    "Patch first to be safe, or launch anyway?"
-                )
-            if not messagebox.askokcancel("Out of date", msg):
-                return
-
         try:
             subprocess.Popen([str(exe)], cwd=str(exe.parent))
         except Exception as e:
