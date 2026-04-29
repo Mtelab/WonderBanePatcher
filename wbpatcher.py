@@ -304,6 +304,26 @@ class PatcherApp(tk.Tk):
             pass
         self.update_idletasks()
 
+    def _kill_running_game(self) -> None:
+        """If sb.exe is running, terminate it before patching. Windows locks
+        running .exe files, which would otherwise cause the patch to fail
+        with a permission error when it tries to overwrite sb.exe / Shadowbane.exe."""
+        if sys.platform != "win32":
+            return
+        for name in (GAME_EXE_REL, "Shadowbane.exe"):
+            try:
+                result = subprocess.run(
+                    ["taskkill", "/F", "/IM", name],
+                    capture_output=True, text=True, timeout=10,
+                )
+                if result.returncode == 0:
+                    self.set_status(f"Closed running {name} before patching.")
+            except Exception as e:
+                sys.stderr.write(f"_kill_running_game({name}): {e}\n")
+        # Brief pause so Windows releases the file lock before the patch
+        # thread starts overwriting client files.
+        time.sleep(0.5)
+
     def start_patch(self):
         if self.busy:
             return
@@ -322,6 +342,8 @@ class PatcherApp(tk.Tk):
             self.set_status("sb.exe not found in selected folder.")
             return
         save_settings({"install_dir": str(target)})
+        # Kill any running game instance so file locks don't block the patch.
+        self._kill_running_game()
         self.busy = True
         self.patch_btn.config(state="disabled")
         threading.Thread(target=self._patch_thread, args=(target,), daemon=True).start()
