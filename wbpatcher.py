@@ -77,6 +77,22 @@ def is_protected(rel_path: str) -> bool:
     return any(p.startswith(pat) for pat in PROTECTED_PATTERNS)
 
 
+def detect_install_dir() -> "str | None":
+    """If the patcher executable is sitting in the same folder as sb.exe,
+    return that folder so we can auto-populate the install_dir field.
+    Returns None when the patcher is not co-located with the game."""
+    try:
+        if getattr(sys, "frozen", False):
+            own_dir = Path(sys.executable).parent
+        else:
+            own_dir = Path(__file__).parent
+        if (own_dir / GAME_EXE_REL).is_file():
+            return str(own_dir)
+    except Exception:
+        pass
+    return None
+
+
 def load_settings() -> dict:
     if SETTINGS_FILE.is_file():
         try:
@@ -130,7 +146,7 @@ class PatcherApp(tk.Tk):
         self.configure(bg="#0d0d10")
 
         settings = load_settings()
-        self.install_dir = tk.StringVar(value=settings.get("install_dir", DEFAULT_INSTALL_DIR))
+        self.install_dir = tk.StringVar(value=settings.get("install_dir") or detect_install_dir() or DEFAULT_INSTALL_DIR)
         self.installed_version = settings.get("installed_version")
         self.latest_version = None  # populated after manifest fetch
         self.status = tk.StringVar(value="Ready.")
@@ -185,7 +201,7 @@ class PatcherApp(tk.Tk):
         )
 
         self.bg_canvas.create_text(
-            32, 120, text="Game folder", anchor="w",
+            32, 120, text="Game folder (where sb.exe is located)", anchor="w",
             font=("Segoe UI", 10, "bold"), fill="#e8e8e8",
         )
 
