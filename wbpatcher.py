@@ -310,6 +310,9 @@ class PatcherApp(tk.Tk):
         with a permission error when it tries to overwrite sb.exe / Shadowbane.exe."""
         if sys.platform != "win32":
             return
+        # Show status before running taskkill so the user sees what's happening
+        # — taskkill can take a moment if Windows is unresponsive.
+        self.set_status("Killing any Shadowbane processes...")
         for name in (GAME_EXE_REL, "Shadowbane.exe"):
             try:
                 result = subprocess.run(
